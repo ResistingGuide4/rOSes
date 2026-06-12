@@ -6,6 +6,7 @@
 void terminal_initialize(void);
 void terminal_putchar(char c);
 void terminal_write(const char* data, size_t size);
+void smashstackes(char *c);
 void terminal_writestring(const char* data);
 void terminal_scrollup(void);
 

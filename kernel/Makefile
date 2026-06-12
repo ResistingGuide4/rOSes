@@ -59,6 +59,9 @@ roses.kernel: $(OBJS) $(ARCHDIR)/linker.ld
 $(ARCHDIR)/crtbegin.o $(ARCHDIR)/crtend.o:
 	OBJ=`$(CC) $(CFLAGS) $(LDFLAGS) -print-file-name=$(@F)` && cp "$$OBJ" $@
 
+arch/i386/earlyinit.o: arch/i386/earlyinit.c
+	$(CC) -MD -c $< -o $@ -std=gnu11 $(CFLAGS) -fno-stack-protector $(CPPFLAGS)
+
 .c.o:
 	$(CC) -MD -c $< -o $@ -std=gnu11 $(CFLAGS) $(CPPFLAGS)
 
