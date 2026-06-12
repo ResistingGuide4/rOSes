@@ -57,11 +57,6 @@ void terminal_putchar(char c) {
 	}
 }
 
-void smashstackes(char *c) {
-	char buffer[10];
-	memcpy(buffer, c, strlen(c));
-}
-
 void terminal_write(const char* data, size_t size) {
 	for (size_t i = 0; i < size; i++)
 		terminal_putchar(data[i]);

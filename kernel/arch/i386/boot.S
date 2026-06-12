@@ -1,17 +1,24 @@
 # Declare constants for the multiboot header.
-.set ALIGN,    1<<0             # align loaded modules on page boundaries
-.set MEMINFO,  1<<1             # provide memory map
-.set FLAGS,    ALIGN | MEMINFO  # this is the Multiboot 'flag' field
-.set MAGIC,    0x1BADB002       # 'magic number' lets bootloader find the header
-.set CHECKSUM, -(MAGIC + FLAGS) # checksum of above, to prove we are multiboot
+.set FLAGS,    0  # this is the Multiboot 'flag' field
+.set MAGIC,    0xE85250D6       # 'magic number' lets bootloader find the header
+.set SIZE, header_end - header_start
+.set CHECKSUM, -(MAGIC + FLAGS + SIZE) # checksum of above, to prove we are multiboot
 
 # Declare a header as in the Multiboot Standard.
 .section .multiboot
-.align 4
+.align 8
+header_start:
 .long MAGIC
 .long FLAGS
+.long SIZE
 .long CHECKSUM
+# Tags go here
 
+# Ending tag
+.short 0
+.short 0
+.long 8
+header_end:
 # Reserve a stack for the initial thread.
 .section .bss
 .align 16
