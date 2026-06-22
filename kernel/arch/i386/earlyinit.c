@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <stddef.h>
 
 extern void reloadSegments(void);
 
@@ -58,43 +59,45 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint16_t limit;
-    uint32_t base;   
-} gdt_loc_t;
+    uint32_t base;
+} gdtr_t;
 
 gdt_entry_t gdt[200];
 
-gdt_loc_t gdt_loc;
+gdtr_t gdtr;
 
-gdt_entry_t create_gdt_entry(uint32_t base, uint32_t limit, uint16_t flags) {
-    gdt_entry_t ret_entry;
+void create_gdt_entry(uint8_t index, uint32_t base, uint32_t limit, uint16_t flags) {
     if (limit > 0xFFFFF) {
-        return ret_entry;
+        return;
     }
+    gdt_entry_t *ret_entry = &gdt[index];
 
-    ret_entry.limit_low = limit & 0xFFFF;
-    ret_entry.base_low = base & 0xFFFF;
-    ret_entry.base_mid = (base >> 0x10) & 0xFF;
-    ret_entry.access = flags & 0xFF;
-    ret_entry.limit_high = (limit >> 0x10) & 0xF;
-    ret_entry.flags = (flags >> 0xC) & 0xF;
-    ret_entry.base_high = (base >> 0x18) & 0xFF;
+    ret_entry->limit_low = limit & 0xFFFF;
+    ret_entry->base_low = base & 0xFFFF;
+    ret_entry->base_mid = (base >> 0x10) & 0xFF;
+    ret_entry->access = flags & 0xFF;
+    ret_entry->limit_high = (limit >> 0x10) & 0xF;
+    ret_entry->flags = (flags >> 0xC) & 0xF;
+    ret_entry->base_high = (base >> 0x18) & 0xFF;
+}
 
-    return ret_entry;
+void gdt_init(void) {
+    // Initialize the GDT
+    create_gdt_entry(0, 0, 0, 0);
+    create_gdt_entry(1, 0, 0xFFFFF, (GDT_CODE_PL0));
+    create_gdt_entry(2, 0, 0xFFFFF, (GDT_DATA_PL0));
+    create_gdt_entry(3, 0, 0xFFFFF, (GDT_CODE_PL3));
+    create_gdt_entry(4, 0, 0xFFFFF, (GDT_DATA_PL3));
+
+    gdtr.limit = (sizeof gdt) - 1;
+    gdtr.base = (uint32_t)&gdt[0];
+
+    asm volatile ("lgdt %0" : : "m"(gdtr) : );
+    reloadSegments();
 }
 
 void kernel_early_main(void) {
-    // Initialize the GDT
-    gdt[0] = create_gdt_entry(0, 0, 0);
-    gdt[1] = create_gdt_entry(0, 0xFFFFF, (GDT_CODE_PL0));
-    gdt[2] = create_gdt_entry(0, 0xFFFFF, (GDT_DATA_PL0));
-    gdt[3] = create_gdt_entry(0, 0xFFFFF, (GDT_CODE_PL3));
-    gdt[4] = create_gdt_entry(0, 0xFFFFF, (GDT_DATA_PL3));
 
-    gdt_loc.limit = (sizeof gdt) - 1;
-    gdt_loc.base = (uint32_t)&gdt;
-
-    asm volatile ("lgdt %0" : : "m"(gdt_loc) : );
-    reloadSegments();
 }
 
 // Allocate the global guard variable

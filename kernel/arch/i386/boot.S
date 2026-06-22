@@ -33,6 +33,9 @@ stack_top:
 _start:
 	movl $stack_top, %esp
 
+   # Initialize the GDT
+   call gdt_init
+
 	# Setup necessary components like the GDT and Memory Management
 	call kernel_early_main
 
