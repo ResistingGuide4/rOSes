@@ -3,6 +3,40 @@
 #include <stddef.h>
 
 extern void reloadSegments(void);
+extern uint32_t stack_top;
+
+typedef struct __attribute__((packed)) {
+    uint32_t link;
+    uint32_t esp0;
+    uint32_t ss0;
+    uint32_t esp1;
+    uint32_t ss1;
+    uint32_t esp2;
+    uint32_t ss2;
+    uint32_t cr3;
+    uint32_t eip;
+    uint32_t eflags;
+    uint32_t eax;
+    uint32_t ecx;
+    uint32_t edx;
+    uint32_t ebx;
+    uint32_t esp;
+    uint32_t ebp;
+    uint32_t esi;
+    uint32_t edi;
+    uint32_t es;
+    uint32_t cs;
+    uint32_t ss;
+    uint32_t ds;
+    uint32_t fs;
+    uint32_t gs;
+    uint32_t ldtr;
+    uint16_t reserved; // To move iobp 2 bytes forward
+    uint16_t iopb;
+    uint32_t ssp;
+} tss_t;
+
+tss_t tss_1;
 
 // Each define here is for a specific flag in the descriptor.
 // Refer to the intel documentation for a description of what each one does.
@@ -88,12 +122,22 @@ void gdt_init(void) {
     create_gdt_entry(2, 0, 0xFFFFF, (GDT_DATA_PL0));
     create_gdt_entry(3, 0, 0xFFFFF, (GDT_CODE_PL3));
     create_gdt_entry(4, 0, 0xFFFFF, (GDT_DATA_PL3));
+    create_gdt_entry(5, (uint32_t)&tss_1, sizeof(tss_t) - 1, SEG_CODE_EXA | SEG_PRES(1));
+
+    tss_1.ss0 = 0x10;
+    tss_1.esp = stack_top;
+    tss_1.iopb = sizeof(tss_t);
 
     gdtr.limit = (sizeof gdt) - 1;
     gdtr.base = (uint32_t)&gdt[0];
 
-    asm volatile ("lgdt %0" : : "m"(gdtr) : );
+    asm volatile ("lgdt %0" : : "m"(gdtr) : "memory");
     reloadSegments();
+
+    asm volatile (
+        "movw $0x28, %%ax\n\t\
+        ltr %%ax" : : : "eax"
+    );
 }
 
 void kernel_early_main(void) {
