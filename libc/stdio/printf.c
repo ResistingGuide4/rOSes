@@ -28,7 +28,7 @@ int printf(const char* restrict format, ...) {
 			while (format[amount] && format[amount] != '%')
 				amount++;
 			if (maxrem < amount) {
-				// TODO: Set errno to EOVERFLOW.
+				// TODO: Set errno to EOVERFLOW
 				return -1;
 			}
 			if (!print(format, amount))
@@ -59,6 +59,43 @@ int printf(const char* restrict format, ...) {
 				return -1;
 			}
 			if (!print(str, len))
+				return -1;
+			written += len;
+		} else if (*format == 'd') {
+			format++;
+			int num = va_arg(parameters, int);
+			char buffer[12];
+			size_t pos = 0;
+
+			unsigned int value;
+			if (num < 0) {
+				buffer[pos++] = '-';
+				value = (unsigned int) -(num + 1) + 1u;
+			} else {
+				value = (unsigned int) num;
+			}
+
+			size_t start = pos;
+			do {
+				if (pos >= sizeof(buffer)) {
+					return -1;
+				}
+				buffer[pos++] = '0' + (value % 10);
+				value /= 10;
+			} while (value != 0);
+
+			for (size_t i = start, j = pos; i < --j; i++) {
+				char tmp = buffer[i];
+				buffer[i] = buffer[j];
+				buffer[j] = tmp;
+			}
+
+			size_t len = pos;
+			if (maxrem < len) {
+				// TODO: Set errno to EOVERFLOW.
+				return -1;
+			}
+			if (!print(buffer, len))
 				return -1;
 			written += len;
 		} else {
