@@ -1,4 +1,4 @@
-# Declare constants for the multiboot header.
+# Declare constants for the multiboot 2 header.
 .set FLAGS,    0  # this is the Multiboot 'flag' field
 .set MAGIC,    0xE85250D6       # 'magic number' lets bootloader find the header
 .set SIZE, header_end - header_start
@@ -13,8 +13,13 @@ header_start:
 .long SIZE
 .long CHECKSUM
 # Tags go here
-
+.align 8
+.short 1
+.short 0
+.long 12
+.long 6
 # Ending tag
+.align 8
 .short 0
 .short 0
 .long 8
@@ -32,7 +37,12 @@ stack_top:
 .global _start
 .type _start, @function
 _start:
+   # Initialize Stack
 	movl $stack_top, %esp
+
+   # Push Data Requested from Bootloader to Stack
+   pushl %eax 
+   pushl %ebx
 
    # Initialize the GDT
    call gdt_init
