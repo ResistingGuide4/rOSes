@@ -5,7 +5,7 @@
 .set CHECKSUM, -(MAGIC + FLAGS + SIZE) # checksum of above, to prove we are multiboot
 
 # Declare a header as in the Multiboot Standard.
-.section .multiboot
+.section .multiboot,"a",@progbits
 .align 8
 header_start:
 .long MAGIC
@@ -32,8 +32,20 @@ stack_bottom:
 .global stack_top
 stack_top:
 
+.section .data
+.align 4096
+.global page_directory_start
+page_directory_start:
+.skip 4096
+.global page_table1_start
+page_table1_start:
+.skip 4096
+.global page_table768_start
+page_table768_start:
+.skip 4096
+
 # The kernel entry point.
-.section .text
+.section .boot,"ax",@progbits
 .global _start
 .type _start, @function
 _start:
@@ -41,14 +53,25 @@ _start:
 	movl $stack_top, %esp
 
    # Push Data Requested from Bootloader to Stack
-   pushl %eax 
+   pushl %eax
    pushl %ebx
 
+	# Setup necessary components like Memory Management
+	call kernel_early_main
+
+   movl page_directory_start, %eax
+   movl %eax, %cr3
+
+   movl %cr0, %eax
+   orl $0x80000001, %eax
+   movl %eax, %cr0
+
+   ljmp $0x08, $higher_half_start
+.size _start, . - _start
+.section .text
+higher_half_start:
    # Initialize the GDT
    call gdt_init
-
-	# Setup necessary components like the GDT and Memory Management
-	call kernel_early_main
 
 	# Call the global constructors.
 	call _init
@@ -60,7 +83,7 @@ _start:
 	cli
 1:	hlt
 	jmp 1b
-.size _start, . - _start
+.size higher_half_start, . - higher_half_start
 
 .global reloadSegments
 reloadSegments:

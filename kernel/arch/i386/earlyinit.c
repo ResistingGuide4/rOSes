@@ -7,6 +7,9 @@
 
 extern void reloadSegments(void);
 extern uint32_t stack_top;
+extern uint32_t page_directory_start[1024];
+extern uint32_t page_table1_start[1024];
+extern uint32_t page_table768_start[1024];
 
 tss_t tss_1;
 
@@ -72,9 +75,9 @@ struct multiboot_tag *multiboot_find_tag(void *mbd, uint32_t type) {
 	return 0;
 }
 
-void kernel_early_main(void *mbd, uint32_t magic) {
-    if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
-        panic("invalid magic number!");
+void __attribute__((section(".boot"), used)) kernel_early_main(/*void *mbd, uint32_t magic*/) {
+    /*if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
+        abort();
     }
     
     struct multiboot_tag_mmap *tag_mmap =
@@ -82,17 +85,25 @@ void kernel_early_main(void *mbd, uint32_t magic) {
 		mbd, MULTIBOOT_TAG_TYPE_MMAP);
 
 	if (!tag_mmap) {
-		panic("No memory map tag found!\n");
+		abort();
 	}
 
 	struct multiboot_mmap_entry *entry =
 	    (struct multiboot_mmap_entry *)(uintptr_t)tag_mmap->entries;
 	while ((void *)entry < (void *)tag_mmap + tag_mmap->size) {
-		/*kprintf("Start Addr: %x | Length: %x | Type: %i.\n",
-		    entry->addr, entry->len, entry->type);*/
+		kprintf("Start Addr: %x | Length: %x | Type: %i.\n",
+		    entry->addr, entry->len, entry->type);
 		entry = (void *)entry + tag_mmap->entry_size;
-	}
+	}*/
 
+    for (int i = 0; i < 1024; i++) {
+        page_table1_start[i] = (i * 0x1000) | 0x3;
+        page_table768_start[i] = (i * 0x1000) | 0x3;
+    }
+
+    page_directory_start[0] = (uint32_t)page_table1_start | 0x3;
+    page_directory_start[768] = (uint32_t)page_table768_start | 0x3;
+    page_directory_start[1023] = (uint32_t)page_directory_start | 0x3;
 }
 
 // Allocate the global guard variable
