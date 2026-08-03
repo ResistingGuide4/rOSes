@@ -11,13 +11,13 @@ extern uint32_t page_directory_start[1024];
 extern uint32_t page_table1_start[1024];
 extern uint32_t page_table768_start[1024];
 
-tss_t tss_1;
+tss_t __attribute__((section(".bootdata"), used)) tss_1;
 
-gdt_entry_t gdt[200];
+gdt_entry_t __attribute__((section(".bootdata"), used)) gdt[200];
 
-gdtr_t gdtr;
+gdtr_t __attribute__((section(".bootdata"), used)) gdtr;
 
-void create_gdt_entry(uint8_t index, uint32_t base, uint32_t limit, uint16_t flags) {
+void __attribute__((section(".boot"), used)) create_gdt_entry(uint8_t index, uint32_t base, uint32_t limit, uint16_t flags) {
     if (limit > 0xFFFFF) {
         return;
     }
@@ -32,7 +32,7 @@ void create_gdt_entry(uint8_t index, uint32_t base, uint32_t limit, uint16_t fla
     ret_entry->base_high = (base >> 0x18) & 0xFF;
 }
 
-void gdt_init(void) {
+void __attribute__((section(".boot"), used)) gdt_init(void) {
     // Initialize the GDT
     create_gdt_entry(0, 0, 0, 0);
     create_gdt_entry(1, 0, 0xFFFFF, (GDT_CODE_PL0));
@@ -100,7 +100,7 @@ void __attribute__((section(".boot"), used)) kernel_early_main(/*void *mbd, uint
         page_table1_start[i] = (i * 0x1000) | 0x3;
         page_table768_start[i] = (i * 0x1000) | 0x3;
     }
-
+    asm volatile("afterfill:");
     page_directory_start[0] = (uint32_t)page_table1_start | 0x3;
     page_directory_start[768] = (uint32_t)page_table768_start | 0x3;
     page_directory_start[1023] = (uint32_t)page_directory_start | 0x3;

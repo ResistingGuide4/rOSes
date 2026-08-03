@@ -24,15 +24,8 @@ header_start:
 .short 0
 .long 8
 header_end:
-# Reserve a stack for the initial thread.
-.section .bss
-.align 16
-stack_bottom:
-.skip 16384 # 16 KiB
-.global stack_top
-stack_top:
 
-.section .data
+.section .bootdata
 .align 4096
 .global page_directory_start
 page_directory_start:
@@ -43,6 +36,12 @@ page_table1_start:
 .global page_table768_start
 page_table768_start:
 .skip 4096
+
+.align 16
+stack_bottom:
+.skip 16384 # 16 KiB
+.global stack_top
+stack_top:
 
 # The kernel entry point.
 .section .boot,"ax",@progbits
@@ -56,10 +55,13 @@ _start:
    pushl %eax
    pushl %ebx
 
+   # Initialize the GDT
+   call gdt_init
+
 	# Setup necessary components like Memory Management
 	call kernel_early_main
 
-   movl page_directory_start, %eax
+   movl $page_directory_start, %eax
    movl %eax, %cr3
 
    movl %cr0, %eax
@@ -68,22 +70,6 @@ _start:
 
    ljmp $0x08, $higher_half_start
 .size _start, . - _start
-.section .text
-higher_half_start:
-   # Initialize the GDT
-   call gdt_init
-
-	# Call the global constructors.
-	call _init
-
-	# Transfer control to the main kernel.
-	call kernel_main
-
-	# Hang if kernel_main unexpectedly returns.
-	cli
-1:	hlt
-	jmp 1b
-.size higher_half_start, . - higher_half_start
 
 .global reloadSegments
 reloadSegments:
@@ -98,3 +84,18 @@ reloadSegments:
    movw  %ax, %gs
    movw  %ax, %ss
    ret
+
+.section .text
+higher_half_start:
+   
+	# Call the global constructors.
+	call _init
+
+	# Transfer control to the main kernel.
+	call kernel_main
+
+	# Hang if kernel_main unexpectedly returns.
+	cli
+1:	hlt
+	jmp 1b
+.size higher_half_start, . - higher_half_start

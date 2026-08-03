@@ -15,6 +15,7 @@ SECTIONS
 		. = ALIGN(8);
 		KEEP(*(.multiboot))
 		*(.boot)
+		*(.bootdata)
 	}
 
 	/* First put the multiboot header, as it is required to be put very early
