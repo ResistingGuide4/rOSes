@@ -58,8 +58,8 @@ _start:
    # Initialize the GDT
    call gdt_init
 
-	# Setup necessary components like Memory Management
-	call kernel_early_main
+	# Initialize the Page Directory and Page Tables with Higher-Half
+	call pd_init
 
    movl $page_directory_start, %eax
    movl %eax, %cr3
@@ -87,7 +87,9 @@ reloadSegments:
 
 .section .text
 higher_half_start:
-   
+   #Initialize Heap and Memory Managment
+   call heap_init
+
 	# Call the global constructors.
 	call _init
 

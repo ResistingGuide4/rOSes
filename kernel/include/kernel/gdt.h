@@ -1,5 +1,8 @@
 #ifndef GDT_H
 #define GDT_H 1
+
+#include <stdint.h>
+
 typedef struct __attribute__((packed)) {
     uint32_t link;
     uint32_t esp0;
