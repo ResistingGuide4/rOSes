@@ -64,7 +64,7 @@ int printf(const char* restrict format, ...) {
 		} else if (*format == 'd') {
 			format++;
 			int num = va_arg(parameters, int);
-			char buffer[12];
+			char buffer[11];
 			size_t pos = 0;
 
 			unsigned int value;
@@ -98,6 +98,64 @@ int printf(const char* restrict format, ...) {
 			if (!print(buffer, len))
 				return -1;
 			written += len;
+		} else if (*format == 'u') {
+			format++;
+			unsigned int value = va_arg(parameters, unsigned int);
+			char buffer[10];
+			size_t pos = 0;
+
+			size_t start = pos;
+			do {
+				if (pos >= sizeof(buffer)) {
+					return -1;
+				}
+				buffer[pos++] = '0' + (value % 10);
+				value /= 10;
+			} while (value != 0);
+
+			for (size_t i = start, j = pos; i < --j; i++) {
+				char tmp = buffer[i];
+				buffer[i] = buffer[j];
+				buffer[j] = tmp;
+			}
+
+			size_t len = pos;
+			if (maxrem < len) {
+				// TODO: Set errno to EOVERFLOW.
+				return -1;
+			}
+			if (!print(buffer, len))
+				return -1;
+			written += len;
+		} else if (*format == 'x' || *format == 'X') {
+			unsigned int value = va_arg(parameters, unsigned int);
+			char buffer[8];
+			size_t pos = 0;
+
+			size_t start = 0;
+			do {
+				if (pos >= sizeof(buffer)) {
+					return -1;
+				}
+				buffer[pos++] = ((value % 16 > 9) ? (*format == 'X' ? '7' : 'W'): '0') + (value % 16);
+				value /= 16;
+			} while (value != 0);
+
+			for (size_t i = start, j = pos; i < --j; i++) {
+				char tmp = buffer[i];
+				buffer[i] = buffer[j];
+				buffer[j] = tmp;
+			}
+
+			size_t len = pos;
+			if (maxrem < len) {
+				// TODO: Set errno to EOVERFLOW.
+				return -1;
+			}
+			if (!print(buffer, len))
+				return -1;
+			written += len;
+			format++;
 		} else {
 			format = format_begun_at;
 			size_t len = strlen(format);
