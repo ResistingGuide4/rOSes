@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #include <kernel/multiboot2.h>
-#include <kernel/testing.h>
+#include <kernel/pmm.h>
 
 struct multiboot_tag *multiboot_find_tag(void *mbd, uint32_t type) {
     /* The multiboot info structure begins with a 32-bit integer
@@ -23,9 +23,6 @@ struct multiboot_tag *multiboot_find_tag(void *mbd, uint32_t type) {
 	return 0;
 }
 
-struct multiboot_tag_mmap *memory_map;
-uint32_t multiboot_magic;
-
 void heap_init(void *mbd, uint32_t magic) {
     if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
         abort();
@@ -39,21 +36,7 @@ void heap_init(void *mbd, uint32_t magic) {
 		abort();
 	}
 
-	memory_map = tag_mmap;
-	multiboot_magic = magic;
-}
-
-void readMMap() {
-	printf("Magic: %d\n", multiboot_magic);
-	struct multiboot_mmap_entry *entry =
-	    (struct multiboot_mmap_entry *)(uintptr_t)memory_map->entries;
-	while ((void *)entry < (void *)memory_map + memory_map->size) {
-		printf("Start Addr Low: %X | Start Addr High: %X | Length Low: %X | Length High: %X | Type: %d.\n",
-		    (unsigned int)entry->addr_low, (unsigned int)entry->addr_high, 
-			(unsigned int)entry->len_low, (unsigned int)entry->len_high, (unsigned int)entry->type);
-        
-		entry = (void *)entry + memory_map->entry_size;
-	}
+	pmm_init(tag_mmap, magic);
 }
 
 // Allocate the global guard variable

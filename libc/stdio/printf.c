@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 static bool print(const char* data, size_t length) {
 	const unsigned char* bytes = (const unsigned char*) data;
@@ -67,7 +68,7 @@ int printf(const char* restrict format, ...) {
 			char buffer[11];
 			size_t pos = 0;
 
-			unsigned int value;
+			uint32_t value;
 			if (num < 0) {
 				buffer[pos++] = '-';
 				value = (unsigned int) -(num + 1) + 1u;
@@ -100,7 +101,7 @@ int printf(const char* restrict format, ...) {
 			written += len;
 		} else if (*format == 'u') {
 			format++;
-			unsigned int value = va_arg(parameters, unsigned int);
+			uint32_t value = va_arg(parameters, uint32_t);
 			char buffer[10];
 			size_t pos = 0;
 
@@ -128,7 +129,7 @@ int printf(const char* restrict format, ...) {
 				return -1;
 			written += len;
 		} else if (*format == 'x' || *format == 'X') {
-			unsigned int value = va_arg(parameters, unsigned int);
+			uint32_t value = va_arg(parameters, uint32_t);
 			char buffer[8];
 			size_t pos = 0;
 
