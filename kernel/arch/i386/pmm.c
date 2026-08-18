@@ -17,13 +17,20 @@ void pmm_init(struct multiboot_tag_mmap *mmap, uint32_t magic) {
             (struct multiboot_mmap_entry *)(uintptr_t)mmap->entries;
     while ((void *)entry < (void *)mmap + mmap->size) {
         if (entry->type == 1 && entry->addr_low <= 0xFFFFF000) {
-            uint32_t aligned_addr = (entry->addr_low + 4095) & ~4095;  // Align up
+            uint32_t aligned_addr = (entry->addr_low + 4095) & ~4095;  // Align uP
+            if (aligned_addr < 0x400000 /*4 Mib*/) {
+                aligned_addr = 0x400000; //First 4 Mib is already mapped
+            }
+
             uint32_t end_addr = entry->addr_low + entry->len_low;
+            if (end_addr > 0x100000000) {
+                end_addr = 0x100000000;
+            }
             
-            if (end_addr > aligned_addr && end_addr <= 0x100000000) {
+            if (end_addr > aligned_addr) {
                 uint32_t len = end_addr - aligned_addr;
                 uint32_t pages = len / 4096;
-                
+
                 if (pages) {
                     last_freed++;
                     last_freed->addr = aligned_addr;

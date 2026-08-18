@@ -30,8 +30,8 @@ header_end:
 .global page_directory_start
 page_directory_start:
 .skip 4096
-.global page_table1_start
-page_table1_start:
+.global page_table0_start
+page_table0_start:
 .skip 4096
 .global page_table768_start
 page_table768_start:
