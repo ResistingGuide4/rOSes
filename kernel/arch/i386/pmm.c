@@ -7,7 +7,7 @@ struct multiboot_tag_mmap *memory_map;
 uint32_t multiboot_magic;
 
 free_block_t free_blocks[1024];
-uint16_t last_freed = -1;
+free_block_t *last_freed = free_blocks - 1;
 
 void pmm_init(struct multiboot_tag_mmap *mmap, uint32_t magic) {
     memory_map = mmap;
@@ -26,8 +26,8 @@ void pmm_init(struct multiboot_tag_mmap *mmap, uint32_t magic) {
                 
                 if (pages) {
                     last_freed++;
-                    free_blocks[last_freed].addr = aligned_addr;
-                    free_blocks[last_freed].len = pages;
+                    last_freed->addr = aligned_addr;
+                    last_freed->len = pages;
                 }
             }
         }
@@ -35,11 +35,33 @@ void pmm_init(struct multiboot_tag_mmap *mmap, uint32_t magic) {
     }
 }
 
+uint32_t alloc_page() {
+    if (last_freed < free_blocks) {
+        //TODO: Swap out to disk
+    }
+
+    if (--(last_freed->len) == 0) {
+        last_freed--;
+        return (last_freed+1)->addr;
+    }
+    return last_freed->addr + 4096 * last_freed->len;
+}
+
+void free_page(uint32_t addr) {;
+    if (addr == last_freed->addr + last_freed->len * 4096) {
+        last_freed->len++;
+        return;
+    }
+    last_freed++;
+    last_freed->addr = addr;
+    last_freed->len = 1;
+}
+
 void readFreeBlocks() {
-    for (int i = 0; i <= last_freed; i++) {
+    for (int i = 0; i <= last_freed - free_blocks; i++) {
         printf("Address: %X | Size in Pages: %u\n", free_blocks[i].addr, free_blocks[i].len);
     }
-    printf("Last Freed: %d\n\n", last_freed);
+    printf("Last Freed Index: %X\n\n", last_freed - free_blocks);
 }
 
 void readMMap() {

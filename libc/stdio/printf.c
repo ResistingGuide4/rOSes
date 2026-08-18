@@ -131,6 +131,7 @@ int printf(const char* restrict format, ...) {
 		} else if (*format == 'x' || *format == 'X') {
 			uint32_t value = va_arg(parameters, uint32_t);
 			char buffer[8];
+			char *pref = "0x";
 			size_t pos = 0;
 
 			size_t start = 0;
@@ -153,6 +154,8 @@ int printf(const char* restrict format, ...) {
 				// TODO: Set errno to EOVERFLOW.
 				return -1;
 			}
+			if (!print(pref, 2))
+				return -1;
 			if (!print(buffer, len))
 				return -1;
 			written += len;
