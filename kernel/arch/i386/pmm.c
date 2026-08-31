@@ -6,8 +6,8 @@
 struct multiboot_tag_mmap *memory_map;
 uint32_t multiboot_magic;
 
-free_block_t free_blocks[1024];
-free_block_t *last_freed = free_blocks - 1;
+pmm_block_t free_blocks[1024];
+pmm_block_t *last_freed = free_blocks - 1;
 
 void pmm_init(struct multiboot_tag_mmap *mmap, uint32_t magic) {
     memory_map = mmap;
@@ -22,7 +22,7 @@ void pmm_init(struct multiboot_tag_mmap *mmap, uint32_t magic) {
                 aligned_addr = 0x400000; //First 4 Mib is already mapped
             }
 
-            uint32_t end_addr = entry->addr_low + entry->len_low;
+            uint64_t end_addr = entry->addr_low + entry->len_low;
             if (end_addr > 0x100000000) {
                 end_addr = 0x100000000;
             }
@@ -42,16 +42,17 @@ void pmm_init(struct multiboot_tag_mmap *mmap, uint32_t magic) {
     }
 }
 
-uint32_t alloc_page() {
+void *alloc_page() {
     if (last_freed < free_blocks) {
         //TODO: Swap out to disk
+        return NULL;
     }
 
     if (--(last_freed->len) == 0) {
         last_freed--;
-        return (last_freed+1)->addr;
+        return (void *)(last_freed+1)->addr;
     }
-    return last_freed->addr + 4096 * last_freed->len;
+    return (void *)(last_freed->addr + 4096 * last_freed->len);
 }
 
 void free_page(uint32_t addr) {;

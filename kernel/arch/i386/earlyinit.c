@@ -4,6 +4,7 @@
 
 #include <kernel/multiboot2.h>
 #include <kernel/pmm.h>
+#include <kernel/vmm.h>
 
 struct multiboot_tag *multiboot_find_tag(void *mbd, uint32_t type) {
     /* The multiboot info structure begins with a 32-bit integer
@@ -37,6 +38,7 @@ void heap_init(void *mbd, uint32_t magic) {
 	}
 
 	pmm_init(tag_mmap, magic);
+	vmm_init();
 }
 
 // Allocate the global guard variable
