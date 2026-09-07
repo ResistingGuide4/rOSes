@@ -146,9 +146,12 @@ static void unmap_page(void *virtualaddr) {
     //Note: This function does not flush the TLB to save time as this only unmaps 1 page. Anything that calls this should flush it after all of it's calls to this function.
 }
 
-void *alloc_block(uint32_t size) {
+void *alloc_block(uint32_t size, bool isKernel) {
+    vmm_block_t **space = (isKernel ? &kernel_space : &user_space);
+    vmm_block_t **space_end = (isKernel ? &kernel_space_end : &user_space_end);
+
     void *virt_addr = NULL;
-    for (vmm_block_t *block = user_space_end; block >= user_space; block--) {
+    for (vmm_block_t *block = *space_end; block >= *space; block--) {
         if (block->size >= size) {
             block->size -= size;
             block = check_lower(block, false);
@@ -172,16 +175,19 @@ void *alloc_block(uint32_t size) {
     return virt_addr;
 }
 
-void free_block(void *addr, uint32_t size) {
-    if (++user_space_end == user_space + 512) {
+void free_block(void *addr, uint32_t size, bool isKernel) {
+    vmm_block_t **space = (isKernel ? &kernel_space : &user_space);
+    vmm_block_t **space_end = (isKernel ? &kernel_space_end : &user_space_end);
+
+    if (++(*space_end) == *space + 512) {
         //TODO: RUN DEFRAGMENT FUNCTION AND FAIL IF NO CHANGES ARE MADE
         return;
     }
 
-    user_space_end->addr = addr;
-    user_space_end->size = size;
+    (*space_end)->addr = addr;
+    (*space_end)->size = size;
 
-    check_upper(user_space_end, false);
+    check_upper(*space_end, false);
 
     for (unsigned int i = 0; i < size; i++) {
         unmap_page(addr + i * 4096);
