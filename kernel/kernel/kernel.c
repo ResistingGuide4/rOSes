@@ -1,13 +1,11 @@
 #include <stdio.h>
 
 #include <kernel/tty.h>
-#include <kernel/pmm.h>
-#include <kernel/vmm.h>
+#include <kernel/heap.h>
 
 void kernel_main(void) {
 	terminal_initialize();
-	uint32_t *alloced = alloc_block(16);
-	read_user_space();
-	free_block(alloced, 16);
-	read_user_space();
+	uint32_t *a = kmalloc(32);
+	*a = 12345;
+	printf("%d", *a);
 }

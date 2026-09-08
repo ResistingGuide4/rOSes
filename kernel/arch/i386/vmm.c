@@ -24,7 +24,6 @@ void vmm_init() {
 }
 
 static vmm_block_t *check_lower(vmm_block_t *block, bool is_kernel_space) {
-    //TODO: Add combining if a match is found
     vmm_block_t tmp;
     vmm_block_t *space_end = (is_kernel_space ? kernel_space_end : user_space_end) + 512;
     while (block < space_end && block->size < (block+1)->size) {
@@ -33,11 +32,11 @@ static vmm_block_t *check_lower(vmm_block_t *block, bool is_kernel_space) {
         *block = tmp;
         block += 1;
     }
+    
     return block;
 }
 
 static vmm_block_t *check_upper(vmm_block_t *block, bool is_kernel_space) {
-    //TODO: Add combining if a match is found
     vmm_block_t tmp;
     vmm_block_t *space_start = (is_kernel_space ? kernel_space : user_space);
     while (block > space_start && block->size > (block-1)->size) {
