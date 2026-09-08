@@ -90,6 +90,9 @@ higher_half_start:
    #Initialize Heap and Memory Managment
    call heap_init
 
+   #Initialize the Stack-Smashing Protector
+   call init_ssp
+
 	# Call the global constructors.
 	call _init
 
