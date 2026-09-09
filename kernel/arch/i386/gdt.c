@@ -1,13 +1,15 @@
 #include <kernel/gdt.h>
 
+#define GDT_MAX_DESCRIPTORS 200
+
 extern void reloadSegments(void);
 extern uint32_t stack_top;
 
 tss_t __attribute__((section(".bootdata"), used)) tss_1;
 
-gdt_entry_t __attribute__((section(".bootdata"), used)) gdt[200];
+gdt_entry_t __attribute__((section(".bootdata"), used)) gdt[GDT_MAX_DESCRIPTORS];
 
-gdtr_t __attribute__((section(".bootdata"), used)) gdtr;
+static gdtr_t __attribute__((section(".bootdata"), used)) gdtr;
 
 void __attribute__((section(".boot"), used)) create_gdt_entry(uint8_t index, uint32_t base, uint32_t limit, uint16_t flags) {
     if (limit > 0xFFFFF) {
