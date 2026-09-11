@@ -1,6 +1,7 @@
 #include <kernel/isr.h>
 
 #include <stdbool.h>
+#include <stdio.h>
 
 static inline void outb(uint16_t port, uint8_t val) {
     __asm__ volatile ( "outb %b0, %w1" : : "a"(val), "Nd"(port) : "memory");
@@ -103,4 +104,10 @@ uint16_t pic_get_isr(void) {
 __attribute__((noreturn))
 void exception_handler() {
     __asm__ volatile ("cli; hlt"); // Completely hangs the computer
+}
+
+void keyboard_handler() {
+    inb(0x60);
+    printf("Key Pressed\n");
+    PIC_sendEOI(1);
 }

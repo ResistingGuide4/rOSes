@@ -46,7 +46,7 @@ stack_top:
 .section .data
 .global isr_stub_table
 isr_stub_table:
-.irp vector, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+.irp vector, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33
    .long isr_stub_\vector
 .endr
 
@@ -97,10 +97,10 @@ higher_half_start:
    # Initialize the IDT
    call idt_init
 
-   #Initialize Heap and Memory Managment
+   # Initialize Heap and Memory Managment
    call heap_init
 
-   #Initialize the Stack-Smashing Protector
+   # Initialize the Stack-Smashing Protector
    call init_ssp
 
 	# Call the global constructors.
@@ -161,3 +161,7 @@ isr_no_err_stub 28
 isr_no_err_stub 29
 isr_err_stub    30
 isr_no_err_stub 31
+isr_no_err_stub 32 //Start of PIC Interrupts
+isr_stub_33:
+   call keyboard_handler
+   iret

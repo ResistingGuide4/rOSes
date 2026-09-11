@@ -143,7 +143,7 @@ void kfree(void *addr) {
 	current_header->status = HEAP_FREE;
 	
 	heap_header_t *prev_header = current_header->prev;
-	while (prev_header != NULL && prev_header->status == HEAP_FREE && (uint8_t *)prev_header + sizeof(heap_header_t) + prev_header->size == current_header) {
+	while (prev_header != NULL && prev_header->status == HEAP_FREE && (uint8_t *)prev_header + sizeof(heap_header_t) + prev_header->size == (uint8_t *)current_header) {
 		prev_header->size += sizeof(heap_header_t) + current_header->size;
 		prev_header->next = current_header->next;
 		current_header = prev_header;
@@ -151,7 +151,7 @@ void kfree(void *addr) {
 	}
 
 	heap_header_t *next_header = current_header->next;
-	while (next_header != NULL && next_header->status == HEAP_FREE && (uint8_t *)current_header + sizeof(heap_header_t) + current_header->size == next_header) {
+	while (next_header != NULL && next_header->status == HEAP_FREE && (uint8_t *)current_header + sizeof(heap_header_t) + current_header->size == (uint8_t *)next_header) {
 		current_header->size += sizeof(heap_header_t) + next_header->size;
 		current_header->next = next_header->next;
 		next_header = current_header->next;

@@ -3,9 +3,11 @@
 #include <kernel/tty.h>
 #include <kernel/heap.h>
 
+__attribute__((noreturn))
 void kernel_main(void) {
 	terminal_initialize();
-	uint32_t *a = (uint32_t *)0xD0000000;
-	*a = 12345;
-	printf("%d", *a);
+
+	for (;;) {
+		asm volatile ("hlt");
+	}
 }

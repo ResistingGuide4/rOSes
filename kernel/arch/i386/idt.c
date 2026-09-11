@@ -29,14 +29,17 @@ void idt_init() {
     for (int i = 0; i < 16; i++) {
         IRQ_set_mask(i);
     }
+    IRQ_clear_mask(1);
 
     idtr.base = (uintptr_t)&idt[0];
     idtr.limit = (uint16_t)sizeof(idt_entry_t) * 256 - 1;
 
-    for (uint8_t vector = 0; vector < 32; vector++) {
+    for (uint8_t vector = 0; vector < 34; vector++) {
         idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
         vectors[vector] = true;
     }
 
-    __asm__ volatile ("lidt %0" : : "m"(idtr)); // load the new IDT
+    __asm__ volatile ("lidt %0" : : "m"(idtr) : "memory"); // load the new IDT
+
+    __asm__ volatile ("sti" : : : "memory");
 }

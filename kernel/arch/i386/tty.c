@@ -58,6 +58,9 @@ void terminal_putchar(char c) {
 }
 
 void terminal_write(const char* data, size_t size) {
+	if (terminal_buffer != (uint16_t *)0xB8000) {
+		return;
+	}
 	for (size_t i = 0; i < size; i++)
 		terminal_putchar(data[i]);
 }

@@ -1,6 +1,6 @@
 #include <kernel/gdt.h>
 
-#define GDT_MAX_DESCRIPTORS 200
+#define GDT_MAX_DESCRIPTORS 6
 
 extern void reloadSegments(void);
 extern uint32_t stack_top;
