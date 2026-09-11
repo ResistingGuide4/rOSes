@@ -169,7 +169,6 @@ void *alloc_block(uint32_t size, bool isKernel) {
         if (phys_addr == NULL) {
             return NULL;
         }
-        uint8_t supervisor = (0x4 & isKernel << 2);
         map_page(phys_addr, virt_addr + i * 0x1000, 0x02 | (0x4 & isKernel << 2));
     }
 
