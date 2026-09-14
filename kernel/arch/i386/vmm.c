@@ -190,7 +190,7 @@ void free_block(void *addr, uint32_t size, bool isKernel) {
     check_upper(*space_end, false);
 
     for (unsigned int i = 0; i < size; i++) {
-        free_page(get_physaddr(addr));
+        free_page((uint32_t)get_physaddr(addr));
         unmap_page(addr + i * 4096);
     }
     flush_tlb();
