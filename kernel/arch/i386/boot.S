@@ -100,6 +100,17 @@ higher_half_start:
    # Initialize Heap and Memory Managment
    call heap_init
 
+   # Add the current process to the list of threads
+   call thread_init
+
+   pushl $page_directory_start
+   pushl $background_thread
+   call new_thread
+   pushl 0x1
+   call switch_thread
+   popl %eax
+   popl %eax
+
    # Initialize the Stack-Smashing Protector
    call init_ssp
 
@@ -114,6 +125,9 @@ higher_half_start:
 1:	hlt
 	jmp 1b
 .size higher_half_start, . - higher_half_start
+
+background_thread:
+hlt
 
 # Create ISRs
 .macro isr_err_stub vector
@@ -165,3 +179,51 @@ isr_no_err_stub 32 //Start of PIC Interrupts
 isr_stub_33:
    call keyboard_handler
    iret
+
+.extern current_task_TCB
+.extern piti
+.global switch_tasks
+switch_tasks:
+   # Save previous task's state
+
+   # Notes:
+   #  For cdecl, EAX, ECX, and EDX are already saved by the caller and don't need to be saved again
+   #  EIP is already saved on the stack by the caller's "CALL" instruction
+   #  The task isn't able to change CR3 so it doesn't need to be saved
+   #  Segment registers are constants (while running kernel code) so they don't need to be saved
+
+   pushl %ebx
+   pushl %esi
+   pushl %edi
+   pushl %ebp
+
+   movl current_task_TCB, %edi  # edi = address of the previous task's thread control block
+   movl %esp, 4(%edi)           # Update esp on the previous task's TCB
+
+   # Load next task's state
+   movl 20(%esp), %esi          # esi = next task's thread control block argument
+   movl %esi, current_task_TCB  # Current task's TCB is the next task TCB
+
+   movl 4(%esi),%esp            # Load ESP for next task's kernel stack from the thread's TCB
+   movl 8(%esi),%eax            # eax = address of page directory for next task
+   movl (%esi),%ebx             # ebx = address for the top of the next task's kernel stack
+   movl %ebx,tss_1+4            # Adjust the ESP0 field in the TSS (used by CPU for for CPL=3 -> CPL=0 privilege level changes)
+   movl %cr3, %ecx              # ecx = previous task's virtual address space
+
+   cmpl %ecx, %eax              # Does the virtual address space need to be changed?
+   je .doneVAS                  # no, virtual address space is the same, so don't reload it and cause TLB flushes
+   movl %eax, %cr3              # yes, load the next task's virtual address space
+.doneVAS:
+   movb piti, %al
+   cmpb $0x1, %al
+   jne .exit
+   movb $0x20, %al
+   outb %al, $0x20
+   movb $0x0, piti
+.exit:
+   popl %ebp
+   popl %edi
+   popl %esi
+   popl %ebx
+
+   ret                           # Load next task's EIP from its kernel stack

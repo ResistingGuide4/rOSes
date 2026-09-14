@@ -36,7 +36,7 @@ void __attribute__((section(".boot"), used)) gdt_init(void) {
     create_gdt_entry(5, (uint32_t)&tss_1, sizeof(tss_t) - 1, SEG_CODE_EXA | SEG_PRES(1));
 
     tss_1.ss0 = 0x10;
-    tss_1.esp = stack_top;
+    tss_1.esp0 = stack_top;
     tss_1.iopb = sizeof(tss_t);
 
     gdtr.limit = (sizeof gdt) - 1;
