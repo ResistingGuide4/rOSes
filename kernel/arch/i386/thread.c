@@ -1,7 +1,5 @@
 #include <kernel/thread.h>
-#include <kernel/gdt.h>
 #include <kernel/vmm.h>
-#include <kernel/pmm.h>
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -10,20 +8,18 @@
 
 #define TCB_MAX_THREADS 6
 
+extern void switch_tasks(tcb_t *next_task);
+extern uint8_t stack_top;
+
 tcb_t *current_task_TCB = NULL;
 
 uint8_t used_threads = 0;
 
 tcb_t threads[TCB_MAX_THREADS];
-
 bool piti = false;
 
-extern uint32_t *page_directory_start;
-extern void switch_tasks(tcb_t *next_task);
-extern uint8_t *stack_top;
-
 void thread_init() {
-    threads[used_threads].esp0 = stack_top;
+    threads[used_threads].esp0 = &stack_top;
     asm volatile ("movl %%cr3, %0" : "=rm"(threads[used_threads].cr3) : : "memory");
     current_task_TCB = threads + used_threads;
     used_threads++;
@@ -31,24 +27,15 @@ void thread_init() {
 
 void switch_thread(bool send_eoi) {
     piti = send_eoi | piti;
-    switch_tasks((current_task_TCB == threads + used_threads ? threads : current_task_TCB + 1));
+    switch_tasks((current_task_TCB == threads + used_threads - 1 ? threads : current_task_TCB + 1));
 }
 
 //Creates a new thread with its own stack. Pass NULL for CR3 if you want to create a new PD
 tcb_t *new_thread(uint32_t *eip, uint32_t *cr3) {
-    if (used_threads == 6) {
+    if (used_threads == TCB_MAX_THREADS || cr3 == NULL) {
         return NULL;
     }
     uint32_t *pd = cr3;
-    if (cr3 == NULL) {
-        pd = alloc_block(1, true);
-        if (pd == NULL) {
-            return NULL;
-        }
-        memmove(pd + 768, page_directory_start + 768, 1024);
-        memmove(pd, page_directory_start, 32);
-        asm volatile ("movl %0, %%cr3" : : "rm"(pd) : "memory");
-    }
 
     uint8_t *stack = alloc_block(4, true);
 
@@ -91,6 +78,7 @@ void kill_thread(tcb_t *thread) {
             current_task_TCB--;
         }
         used_threads--;
+        free_block(thread->esp0-0x3fff, 4, true);
     }
 }
 

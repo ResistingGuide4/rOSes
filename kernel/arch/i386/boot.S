@@ -106,7 +106,7 @@ higher_half_start:
    pushl $page_directory_start
    pushl $background_thread
    call new_thread
-   pushl 0x1
+   pushl $0x0
    call switch_thread
    popl %eax
    popl %eax
@@ -127,6 +127,8 @@ higher_half_start:
 .size higher_half_start, . - higher_half_start
 
 background_thread:
+pushl $0x0
+call switch_thread
 hlt
 
 # Create ISRs
@@ -180,7 +182,6 @@ isr_stub_33:
    call keyboard_handler
    iret
 
-.extern current_task_TCB
 .extern piti
 .global switch_tasks
 switch_tasks:

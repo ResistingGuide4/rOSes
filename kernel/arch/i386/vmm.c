@@ -169,7 +169,7 @@ void *alloc_block(uint32_t size, bool isKernel) {
         if (phys_addr == NULL) {
             return NULL;
         }
-        map_page(phys_addr, virt_addr + i * 0x1000, 0x02 | (0x4 & isKernel << 2));
+        map_page(phys_addr, virt_addr + i * 0x1000, 0x02 | (isKernel ? 0x2 : 0x6));
     }
 
     return virt_addr;
