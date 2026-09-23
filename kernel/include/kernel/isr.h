@@ -28,8 +28,15 @@
 #define PIC_READ_IRR                0x0a    /* OCW3 irq ready next CMD read */
 #define PIC_READ_ISR                0x0b    /* OCW3 irq service next CMD read */
 
+#define PIT_CHANNEL_0 0x40
+#define PIT_CHANNEL_1 0x41
+#define PIT_CHANNEL_2 0x42
+#define PIT_MODE_COMMAND 0x43
+
 void PIC_remap(int offset1, int offset2);
 void IRQ_set_mask(uint8_t IRQline);
 void IRQ_clear_mask(uint8_t IRQline);
+void PIT_init();
+void PIT_set_count(unsigned count);
 
 #endif

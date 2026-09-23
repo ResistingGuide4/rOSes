@@ -100,16 +100,15 @@ higher_half_start:
    # Initialize Heap and Memory Managment
    call heap_init
 
+   call terminal_initialize
+
    # Add the current process to the list of threads
    call thread_init
 
    pushl $page_directory_start
-   pushl $background_thread
+   pushl $background_main
    call new_thread
-   pushl $0x0
-   call switch_thread
-   popl %eax
-   popl %eax
+   add $0x8, %esp
 
    # Initialize the Stack-Smashing Protector
    call init_ssp
@@ -125,11 +124,6 @@ higher_half_start:
 1:	hlt
 	jmp 1b
 .size higher_half_start, . - higher_half_start
-
-background_thread:
-pushl $0x0
-call switch_thread
-hlt
 
 # Create ISRs
 .macro isr_err_stub vector
@@ -177,7 +171,11 @@ isr_no_err_stub 28
 isr_no_err_stub 29
 isr_err_stub    30
 isr_no_err_stub 31
-isr_no_err_stub 32 //Start of PIC Interrupts
+isr_stub_32:
+   pushl $0x1
+   call switch_thread
+   add $0x4, %esp
+   iret
 isr_stub_33:
    call keyboard_handler
    iret
@@ -221,6 +219,7 @@ switch_tasks:
    movb $0x20, %al
    outb %al, $0x20
    movb $0x0, piti
+   sti
 .exit:
    popl %ebp
    popl %edi

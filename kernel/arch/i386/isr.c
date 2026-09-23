@@ -101,6 +101,23 @@ uint16_t pic_get_isr(void) {
     return __pic_get_irq_reg(PIC_READ_ISR);
 }
 
+void PIT_set_count(unsigned count) {
+	// Disable interrupts
+	asm volatile ("cli");
+	
+	// Set low byte
+	outb(0x40,count&0xFF);		// Low byte
+	outb(0x40,(count&0xFF00)>>8);	// High byte
+	return;
+}
+
+void PIT_init() {
+    asm volatile ("cli");
+
+    outb(PIT_MODE_COMMAND, 0x36);
+    PIT_set_count(3579545/300); // 100 HZ
+}
+
 __attribute__((noreturn))
 void exception_handler() {
     __asm__ volatile ("cli; hlt"); // Completely hangs the computer

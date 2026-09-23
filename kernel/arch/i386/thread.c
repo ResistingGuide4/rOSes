@@ -26,6 +26,18 @@ void thread_init() {
 }
 
 void switch_thread(bool send_eoi) {
+    if (used_threads < 2) {
+        if (send_eoi) {
+            asm volatile (
+                "movb $0x20, %%al\n\t"
+                "outb %%al, $0x20"
+                :
+                :
+                : "eax"
+            );
+        }
+        return;
+    }
     piti = send_eoi | piti;
     switch_tasks((current_task_TCB == threads + used_threads - 1 ? threads : current_task_TCB + 1));
 }
@@ -70,16 +82,24 @@ tcb_t *new_thread(uint32_t *eip, uint32_t *cr3) {
     return threads + (used_threads++);
 }
 
-// Make sure to switch to a different thread before killing the thread
+// Make sure to kill a thread from a different one
 void kill_thread(tcb_t *thread) {
-    if (thread < threads + 6 && thread >= threads) {
+    asm volatile ("cli");
+
+    if (thread == current_task_TCB) {
+        return;
+    }
+
+    if (thread < threads + TCB_MAX_THREADS && thread >= threads) {
+        used_threads--;
         memmove(thread, thread + 1, sizeof(tcb_t) * (TCB_MAX_THREADS - (thread - threads) - 1));
-        if (current_task_TCB >= thread) {
+        if (current_task_TCB > thread) {
             current_task_TCB--;
         }
-        used_threads--;
         free_block(thread->esp0-0x3fff, 4, true);
     }
+
+    asm volatile ("sti");
 }
 
 void read_threads() {

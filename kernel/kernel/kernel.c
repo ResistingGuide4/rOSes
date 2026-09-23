@@ -5,9 +5,16 @@
 
 __attribute__((noreturn))
 void kernel_main(void) {
-	terminal_initialize();
-	read_threads();
+	printf("Kernel Finished\n");
 	
+	for (;;) {
+		asm volatile ("hlt");
+	}
+}
+
+void background_main(void) {
+	printf("Background Finished\n");
+
 	for (;;) {
 		asm volatile ("hlt");
 	}

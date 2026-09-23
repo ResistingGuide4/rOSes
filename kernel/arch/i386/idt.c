@@ -29,7 +29,9 @@ void idt_init() {
     for (int i = 0; i < 16; i++) {
         IRQ_set_mask(i);
     }
-    // IRQ_clear_mask(1);
+    IRQ_clear_mask(0);
+
+    PIT_init();
 
     idtr.base = (uintptr_t)&idt[0];
     idtr.limit = (uint16_t)sizeof(idt_entry_t) * 256 - 1;
