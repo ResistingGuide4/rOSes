@@ -91,6 +91,12 @@ uint16_t identify_device(PS2_port_t port) {
         id |= (uint16_t)val;
     }
 
+    send_byte(0xF4, port);
+    if (recieve_byte() != 0xFA) {
+        return 0xFFFF;
+    }
+
+
     return id;
 }
 
