@@ -97,6 +97,9 @@ higher_half_start:
    # Initialize the IDT
    call idt_init
 
+   # Initialize the PS/2 Controller
+   call PS2_init
+
    # Initialize Heap and Memory Managment
    call heap_init
 
@@ -104,11 +107,6 @@ higher_half_start:
 
    # Add the current process to the list of threads
    call thread_init
-
-   pushl $page_directory_start
-   pushl $background_main
-   call new_thread
-   add $0x8, %esp
 
    # Initialize the Stack-Smashing Protector
    call init_ssp

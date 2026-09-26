@@ -11,11 +11,3 @@ void kernel_main(void) {
 		asm volatile ("hlt");
 	}
 }
-
-void background_main(void) {
-	printf("Background Finished\n");
-
-	for (;;) {
-		asm volatile ("hlt");
-	}
-}
