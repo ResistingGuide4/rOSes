@@ -175,7 +175,9 @@ isr_stub_32:
    add $0x4, %esp
    iret
 isr_stub_33:
-   call keyboard_handler
+   call PS2_key_handler
+   movb $0x20, %al
+   outb %al, $0x20
    iret
 
 .extern piti

@@ -1,4 +1,5 @@
 #include <kernel/device.h>
+#include <kernel/keyboard.h>
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -69,7 +70,19 @@ uint8_t recieve_byte() {
     return inb(PS2_DATA);
 }
 
+static uint8_t read_config() {
+    send_command(0x20);
+    return recieve_byte();
+}
+
+static void write_config(uint8_t config) {
+    send_command(0x60);
+    send_byte(config, PS2_PORT_ONE);
+}
+
 uint16_t identify_device(PS2_port_t port) {
+    uint8_t config = read_config();
+    write_config(config & ~0x40);
     if ((port == PS2_PORT_ONE && !PS2_port_one) ||
         (port == PS2_PORT_TWO && !PS2_port_two)) {
         return 0xFFFF;
@@ -96,18 +109,9 @@ uint16_t identify_device(PS2_port_t port) {
         return 0xFFFF;
     }
 
+    write_config(config);
 
     return id;
-}
-
-static uint8_t read_config() {
-    send_command(0x20);
-    return recieve_byte();
-}
-
-static void write_config(uint8_t config) {
-    send_command(0x60);
-    send_byte(config, PS2_PORT_ONE);
 }
 
 void PS2_init() {
@@ -151,6 +155,9 @@ void PS2_init() {
                 PS2_device_two = 0xFFFF;
             } else {
                 PS2_device_two = identify_device(PS2_PORT_TWO);
+                if (PS2_device_two > 0xFF && PS2_device_two != 0xFFFF) {
+                    keyboard_init(PS2_PORT_TWO);
+                }
             }
         }
     }
@@ -174,10 +181,13 @@ void PS2_init() {
             PS2_device_one = 0xFFFF;
         } else {
             PS2_device_one = identify_device(PS2_PORT_ONE);
+            if (PS2_device_one > 0xFF && PS2_device_one != 0xFFFF) {
+                keyboard_init(PS2_PORT_ONE);
+            }
         }
     }
 
     config_byte = read_config();
-    config_byte |= (PS2_device_one != 0xFFFF ? 0x1 : 0x0) | (PS2_device_two != 0xFFFF ? 0x2 : 0x0); // Enable IRQ's
+    config_byte |= 0x40 | ((PS2_device_one != 0xFFFF) ? 0x1 : 0x0) | ((PS2_device_two != 0xFFFF) ? 0x2 : 0x0); // Enable IRQ's and translation
     write_config(config_byte);
 }
