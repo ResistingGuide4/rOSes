@@ -66,6 +66,7 @@ void terminal_backspace() {
 	terminal_column--;
 	terminal_putentryat(' ', terminal_color, terminal_column, terminal_row);
 	terminal_move_cursor(terminal_column, terminal_row);
+	line_length[terminal_row] = terminal_column;
 }
 
 void terminal_putchar(char c) {

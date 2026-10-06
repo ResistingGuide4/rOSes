@@ -44,14 +44,14 @@ uint8_t us_querty[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-// Begins at unicode 0x2C
+// Begins at unicode 0x28
 uint8_t us_querty_shift[] = {
-    '<', '_', '>', '?',
+    '"', '(', ')', '+', '<', '_', '>', '?',
     ')', '!', '@', '#', '$', '%', '^', '&', '*', '(', ':', ':', '<', '=', '>', '?',
     '@', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
     'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '^', '_',
     '~', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '{', '|', '}', '~', 0x7f
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '~', 0x7f
 };
 
 PS2_port_t PS2_port = PS2_PORT_ONE;
@@ -136,11 +136,20 @@ uint32_t PS2_key_handler() {
     }
 
     uint8_t unicode = us_querty[keycode];
-    if ((toggle_keys & 0x4) == 0x4 && unicode >= 0x61) {
-        unicode = us_querty_shift[unicode - 0x2C];
+    if ((toggle_keys & 0x4) && unicode >= 0x61) {
+        unicode = us_querty_shift[unicode - 0x28];
     }
-    if ((press_keys & 0x8 || press_keys & 0x40) && unicode >= 0x2C) {
-        unicode = us_querty_shift[unicode - 0x2C];
+    if ((press_keys & 0x8 || press_keys & 0x40) && unicode >= 0x28) {
+        unicode = us_querty_shift[unicode - 0x28];
+    }
+
+    if ((press_keys & 0x2 || press_keys & 0x10)) {
+        if (unicode >= 'a' && unicode <= '}') {
+            unicode -= 0x20;
+        }
+        if (unicode >= 0x40 && unicode < 0x60) {
+            unicode &= 0x1F;
+        }
     }
 
     if (
