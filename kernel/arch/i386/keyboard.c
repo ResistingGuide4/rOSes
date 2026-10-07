@@ -1,5 +1,6 @@
 #include <kernel/keyboard.h>
 #include <kernel/tty.h>
+#include <kernel/thread.h>
 
 #include <stdio.h>
 
@@ -55,14 +56,17 @@ uint8_t us_querty_shift[] = {
 };
 
 PS2_port_t PS2_port = PS2_PORT_ONE;
-uint8_t extended = 0;
-bool released = false; // Flag
+static uint8_t extended = 0;
 uint8_t press_keys = 0; // Bits: 0 - Reserved, 1 - L. Ctrl, 2 - L. Alt, 3 - L. Shift, 4 - R. Ctrl, 5 - R. Alt, 6 - R. Shift
 uint8_t toggle_keys = 0; // Bits: 0 - Scroll Lock, 1 - Num Lock, 2 - Caps Lock
 
+static uint16_t keycode_stack[16];
+static uint16_t *keycode_stack_top = keycode_stack - 1;
+
 // Currently PS2 Only
-static uint8_t scan_to_key() {
+static uint16_t scan_to_key() {
     uint8_t scan_code = inb(0x60);
+    bool released = false; // Flag
     if ((scan_code & 0x80) == 0x80) {
         released = true;
     } else {
@@ -87,7 +91,7 @@ static uint8_t scan_to_key() {
         extended--;
     }
     
-    return keycodes[scan_code];
+    return (uint16_t)released << 8 | (uint16_t)keycodes[scan_code];
 }
 
 void keyboard_init(PS2_port_t new_port) {
@@ -129,77 +133,92 @@ void keyboard_update_leds() {
 */
 
 uint32_t PS2_key_handler() {
-    uint8_t keycode = scan_to_key();
+    uint16_t keycode = scan_to_key();
 
     if (keycode == 0xFF) {
         return 0xFFFFFFFF;
     }
 
-    uint8_t unicode = us_querty[keycode];
-    if ((toggle_keys & 0x4) && unicode >= 0x61) {
-        unicode = us_querty_shift[unicode - 0x28];
-    }
-    if ((press_keys & 0x8 || press_keys & 0x40) && unicode >= 0x28) {
-        unicode = us_querty_shift[unicode - 0x28];
-    }
+    keycode_stack_top++;
+    *keycode_stack_top = keycode;
+}
 
-    if ((press_keys & 0x2 || press_keys & 0x10)) {
-        if (unicode >= 'a' && unicode <= '}') {
-            unicode -= 0x20;
+uint32_t keycode_handler(void) {
+    while (true) {
+        while (keycode_stack_top < keycode_stack) {
+            switch_thread(false);
         }
-        if (unicode >= 0x40 && unicode < 0x60) {
-            unicode &= 0x1F;
-        }
-    }
+        
+        uint8_t keycode = (uint8_t)(*keycode_stack_top);
+        bool released = (bool)((*keycode_stack_top) >> 8) & 0xFF;
+        keycode_stack_top--;
 
-    if (
-        (toggle_keys & 0x2) == 0 && 
-        keycode > 0x40 && keycode < 0xC0 && 
-        /*Is it a keypad num*/(((unsigned)(0x12 - keycode/32 - keycode % 32) < 3) || (keycode == 0xAE))
-    ) {
-        unicode = 0;
-    }
-
-    if (released) {
-        if (keycode == 0xA0) {
-            press_keys &= ~0x2;
-        } else if (keycode == 0xA3) {
-            press_keys &= ~0x4;
-        } else if (keycode == 0x80) {
-            press_keys &= ~0x8;
-        } else if (keycode == 0xA6) {
-            press_keys &= ~0x10;
-        } else if (keycode == 0xA5) {
-            press_keys &= ~0x20;
-        } else if (keycode == 0x8B) {
-            press_keys &= ~0x40;
+        uint8_t unicode = us_querty[keycode];
+        if ((toggle_keys & 0x4) && unicode >= 0x61) {
+            unicode = us_querty_shift[unicode - 0x28];
         }
-    } else {
-        if (keycode == 0xA0) {
-            press_keys |= 0x2;
-        } else if (keycode == 0xA3) {
-            press_keys |= 0x4;
-        } else if (keycode == 0x80) {
-            press_keys |= 0x8;
-        } else if (keycode == 0xA6) {
-            press_keys |= 0x10;
-        } else if (keycode == 0xA5) {
-            press_keys |= 0x20;
-        } else if (keycode == 0x8B) {
-            press_keys |= 0x40;
-        } else if (keycode == 0xC0) {
-            toggle_keys ^= 0x1;
-            keyboard_update_leds();
-        } else if (keycode == 0x2E) {
-            toggle_keys ^= 0x2;
-            keyboard_update_leds();
-        } else if (keycode == 0x60) {
-            toggle_keys ^= 0x4;
-            keyboard_update_leds();
-        } else if (unicode != 0x0) {
-            terminal_eval_unicode(unicode);
+        if ((press_keys & 0x8 || press_keys & 0x40) && unicode >= 0x28) {
+            unicode = us_querty_shift[unicode - 0x28];
         }
-    }
 
-    return ((uint32_t)toggle_keys & 0x7) << 24 | ((uint32_t)press_keys & 0xFE) << 16 | ((uint32_t)released & 0x1) << 16 | ((uint32_t)unicode & 0xFF) << 8 | (uint32_t)keycode & 0xFF;
+        if ((press_keys & 0x2 || press_keys & 0x10)) {
+            if (unicode >= 'a' && unicode <= '}') {
+                unicode -= 0x20;
+            }
+            if (unicode >= 0x40 && unicode < 0x60) {
+                unicode &= 0x1F;
+            }
+        }
+
+        if (
+            (toggle_keys & 0x2) == 0 && 
+            keycode > 0x40 && keycode < 0xC0 && 
+            /*Is it a keypad num*/(((unsigned)(0x12 - keycode/32 - keycode % 32) < 3) || (keycode == 0xAE))
+        ) {
+            unicode = 0;
+        }
+
+        if (released) {
+            if (keycode == 0xA0) {
+                press_keys &= ~0x2;
+            } else if (keycode == 0xA3) {
+                press_keys &= ~0x4;
+            } else if (keycode == 0x80) {
+                press_keys &= ~0x8;
+            } else if (keycode == 0xA6) {
+                press_keys &= ~0x10;
+            } else if (keycode == 0xA5) {
+                press_keys &= ~0x20;
+            } else if (keycode == 0x8B) {
+                press_keys &= ~0x40;
+            }
+        } else {
+            if (keycode == 0xA0) {
+                press_keys |= 0x2;
+            } else if (keycode == 0xA3) {
+                press_keys |= 0x4;
+            } else if (keycode == 0x80) {
+                press_keys |= 0x8;
+            } else if (keycode == 0xA6) {
+                press_keys |= 0x10;
+            } else if (keycode == 0xA5) {
+                press_keys |= 0x20;
+            } else if (keycode == 0x8B) {
+                press_keys |= 0x40;
+            } else if (keycode == 0xC0) {
+                toggle_keys ^= 0x1;
+                keyboard_update_leds();
+            } else if (keycode == 0x2E) {
+                toggle_keys ^= 0x2;
+                keyboard_update_leds();
+            } else if (keycode == 0x60) {
+                toggle_keys ^= 0x4;
+                keyboard_update_leds();
+            } else if (unicode != 0x0) {
+                terminal_eval_unicode(unicode);
+            }
+        }
+
+        //return ((uint32_t)toggle_keys & 0x7) << 24 | ((uint32_t)press_keys & 0xFE) << 16 | ((uint32_t)released & 0x1) << 16 | ((uint32_t)unicode & 0xFF) << 8 | (uint32_t)keycode & 0xFF;
+    }
 }

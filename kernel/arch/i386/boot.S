@@ -108,6 +108,10 @@ higher_half_start:
    # Add the current process to the list of threads
    call thread_init
 
+   pushl $page_directory_start
+   pushl $keycode_handler
+   call new_thread
+
    # Initialize the Stack-Smashing Protector
    call init_ssp
 
