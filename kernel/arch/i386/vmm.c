@@ -7,10 +7,12 @@
 #include <kernel/vmm.h>
 #include <kernel/pmm.h>
 
-vmm_block_t user_space[512]; //Binary Tree representing free space below 0xC0000000
+#define SPACE_SIZE 512
+
+vmm_block_t user_space[SPACE_SIZE]; //Binary Tree representing free space below 0xC0000000
 vmm_block_t *user_space_end = user_space - 1; //Pointer to the last free block in user_space
 
-vmm_block_t kernel_space[512];//Binary Tree representing free space above 0xC0000000
+vmm_block_t kernel_space[SPACE_SIZE];//Binary Tree representing free space above 0xC0000000
 vmm_block_t *kernel_space_end = kernel_space - 1; //Same function as user_space_end
 
 void vmm_init() {
@@ -19,13 +21,13 @@ void vmm_init() {
     user_space_end->size = 785408;
 
     kernel_space_end++;
-    kernel_space_end->addr = (void *)0xC0001000;
-    kernel_space_end->size = 245760;
+    kernel_space_end->addr = (void *)0xC0400000; // Be sure to account for the recursive map at the end
+    kernel_space_end->size = 260096;
 }
 
 static vmm_block_t *check_lower(vmm_block_t *block, bool is_kernel_space) {
     vmm_block_t tmp;
-    vmm_block_t *space_end = (is_kernel_space ? kernel_space_end : user_space_end) + 512;
+    vmm_block_t *space_end = (is_kernel_space ? kernel_space_end : user_space_end);
     while (block < space_end && block->size < (block+1)->size) {
         tmp = *(block+1);
         *(block + 1) = *block;
@@ -39,6 +41,11 @@ static vmm_block_t *check_lower(vmm_block_t *block, bool is_kernel_space) {
 static vmm_block_t *check_upper(vmm_block_t *block, bool is_kernel_space) {
     vmm_block_t tmp;
     vmm_block_t *space_start = (is_kernel_space ? kernel_space : user_space);
+    vmm_block_t *space_end = (is_kernel_space ? kernel_space_end : user_space_end);
+    if (block <= space_start || block > space_end) {
+        return block;
+    }
+
     while (block > space_start && block->size > (block-1)->size) {
         tmp = *(block-1);
         *(block-1) = *block;
@@ -46,15 +53,31 @@ static vmm_block_t *check_upper(vmm_block_t *block, bool is_kernel_space) {
         block -= 1;
     }
 
-    for (vmm_block_t *ptr = block - 1; ptr >= space_start; ptr--) {
-        if (block->addr == (ptr->addr + ptr->size * 4096)) {
+    // TODO: Check for coalesce lower as well
+
+    for (size_t i = (size_t)(block - space_start); i > 0; --i) {
+        vmm_block_t *ptr = &space_start[i - 1];
+        if (ptr->addr == (block->addr + block->size * 4096)) {
+            ptr->addr = block->addr;
             ptr->size += block->size;
-            memmove(block + 1, block, (block + 1 - (is_kernel_space ? kernel_space_end : user_space_end)) * sizeof(vmm_block_t));
+            memmove(block, block + 1, (size_t)(space_end - block) * sizeof *block);
             if (is_kernel_space) {
                 kernel_space_end--;
             } else {
                 user_space_end--;
             }
+            check_upper(ptr, is_kernel_space);
+            return ptr;
+        }
+        if (block->addr == (ptr->addr + ptr->size * 4096)) {
+            ptr->size += block->size;
+            memmove(block, block + 1, (size_t)(space_end - block) * sizeof *block);
+            if (is_kernel_space) {
+                kernel_space_end--;
+            } else {
+                user_space_end--;
+            }
+            check_upper(ptr, is_kernel_space);
             return ptr;
         }
     }
@@ -91,7 +114,7 @@ void *get_physaddr(void *virtualaddr) {
     return (void *)((pt[ptindex] & ~0xFFF) + ((unsigned long)virtualaddr & 0xFFF));
 }
 
-static void map_page(void *physaddr, void *virtualaddr, unsigned int flags) {
+static bool map_page(void *physaddr, void *virtualaddr, unsigned int flags) {
     // Make sure that both addresses are page-aligned.
     physaddr = (void *)((uintptr_t)physaddr & 0xFFFFF000);
     virtualaddr = (void *)((uintptr_t)virtualaddr & 0xFFFFF000);
@@ -110,6 +133,7 @@ static void map_page(void *physaddr, void *virtualaddr, unsigned int flags) {
                 pt[i] = 0x0;
             }
         } else {
+            return false;
             //TODO: Add abort
         }
     }
@@ -121,6 +145,7 @@ static void map_page(void *physaddr, void *virtualaddr, unsigned int flags) {
     } else {
         pt[ptindex] = ((unsigned long)physaddr) | (flags & 0xFFF) | 0x01; // Present
     }
+    return true;
 }
 
 static void unmap_page(void *virtualaddr) {
@@ -143,18 +168,20 @@ static void unmap_page(void *virtualaddr) {
     }
     pt[ptindex] = 0x00;
 
-    //Note: This function does not flush the TLB to save time as this only unmaps 1 page. Anything that calls this should flush it after all of it's calls to this function.
+    //Note: This function does not flush the TLB, as this only unmaps 1 page to save time. Anything that calls this should flush it after all of it's calls to this function.
 }
 
 void *alloc_block(uint32_t size, bool isKernel) {
-    vmm_block_t **space = (vmm_block_t **)(isKernel ? &kernel_space : &user_space);
-    vmm_block_t **space_end = (vmm_block_t **)(isKernel ? &kernel_space_end : &user_space_end);
+    vmm_block_t *space = (isKernel ? kernel_space : user_space);
+    vmm_block_t *space_end = (isKernel ? kernel_space_end : user_space_end);
 
     void *virt_addr = NULL;
-    for (vmm_block_t *block = *space_end; block >= *space; block--) {
+    vmm_block_t *free_block = NULL;
+    for (vmm_block_t *block = space_end; block >= space; block--) {
         if (block->size >= size) {
             block->size -= size;
-            block = check_lower(block, false);
+            block = check_lower(block, isKernel);
+            free_block = block;
             virt_addr = block->addr + block->size * 4096;
             break;
         }
@@ -164,48 +191,92 @@ void *alloc_block(uint32_t size, bool isKernel) {
         //TODO: Run defragmentation function and return NULL if no changes are made;
         return NULL;
     }
+
     for (unsigned int i = 0; i < size; i++) {
         void *phys_addr = alloc_page();
-        if (phys_addr == NULL) {
+        if (phys_addr == NULL || !map_page(phys_addr, virt_addr + i * 0x1000, 0x02 | (isKernel ? 0x2 : 0x6))) {
+            if (phys_addr != NULL) {
+                free_page((uint32_t)phys_addr);
+            }
+            free_block->size += size;
+            free_block = check_upper(free_block, isKernel);
+            for (unsigned int j = 0; j < i; j++) {
+                free_page((uint32_t)get_physaddr(virt_addr + j * 4096));
+                unmap_page(virt_addr + j * 4096);
+            }
+            flush_tlb();
             return NULL;
         }
-        map_page(phys_addr, virt_addr + i * 0x1000, 0x02 | (isKernel ? 0x2 : 0x6));
     }
 
     return virt_addr;
 }
 
-void free_block(void *addr, uint32_t size, bool isKernel) {
-    vmm_block_t **space = (vmm_block_t **)(isKernel ? &kernel_space : &user_space);
-    vmm_block_t **space_end = (vmm_block_t **)(isKernel ? &kernel_space_end : &user_space_end);
-
-    if (++(*space_end) == *space + 512) {
-        //TODO: RUN DEFRAGMENT FUNCTION AND FAIL IF NO CHANGES ARE MADE
-        return;
+bool free_block(void *addr, uint32_t size, bool isKernel) {
+    for (unsigned int i = 0; i < size; i++) {
+        if (get_physaddr(addr + i * 4096) == NULL) {
+            return false;
+        }
     }
 
-    (*space_end)->addr = addr;
-    (*space_end)->size = size;
+    vmm_block_t *space = (isKernel ? kernel_space : user_space);
+    vmm_block_t *space_end = (isKernel ? kernel_space_end : user_space_end);
 
-    check_upper(*space_end, false);
+    bool vmm_updated = false;
+    if (++space_end == space + SPACE_SIZE) {
+        for (size_t i = (size_t)(space_end - space); i > 0; --i) {
+            vmm_block_t *ptr = &space[i - 1];
+            if (ptr->addr + ptr->size * 4096 == addr) {
+                ptr->size += size;
+                check_upper(ptr, isKernel);
+                vmm_updated = true;
+                space_end--;
+                break;
+            }
+            if (addr + size * 4096 == ptr->addr) {
+                ptr->addr = addr;
+                ptr->size += size;
+                check_upper(ptr, isKernel);
+                vmm_updated = true;
+                space_end--;
+                break;
+            }
+        }
+        if (!vmm_updated) {
+            return false;
+        }
+    }
+    
+    if (!vmm_updated) {
+        if (isKernel) {
+            kernel_space_end++;
+        } else {
+            user_space_end++;
+        }
+
+        space_end->addr = addr;
+        space_end->size = size;
+
+        check_upper(space_end, isKernel);
+    }
 
     for (unsigned int i = 0; i < size; i++) {
-        free_page((uint32_t)get_physaddr(addr));
+        free_page((uint32_t)get_physaddr(addr + i * 4096));
         unmap_page(addr + i * 4096);
+        
     }
     flush_tlb();
+    return true;
 }
 
 void read_kernel_space() {
     for (vmm_block_t *ptr = kernel_space; ptr <= kernel_space_end; ptr++) {
         printf("Address: %X | Size: %u\n", ptr->addr, ptr->size);
     }
-    printf("\n");
 }
 
 void read_user_space() {
     for (vmm_block_t *ptr = user_space; ptr <= user_space_end; ptr++) {
         printf("Address: %X | Size: %u\n", ptr->addr, ptr->size);
     }
-    printf("\n");
 }

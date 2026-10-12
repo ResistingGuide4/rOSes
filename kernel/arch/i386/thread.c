@@ -16,6 +16,9 @@ tcb_t *current_task_TCB = NULL;
 uint8_t used_threads = 0;
 
 tcb_t threads[TCB_MAX_THREADS];
+uint32_t dead_stacks[TCB_MAX_THREADS]; // TODO: Add this to garbage collection system
+static uint32_t dead_stack_count = 0;
+
 bool piti = false;
 
 void thread_init() {
@@ -87,16 +90,21 @@ void kill_thread(tcb_t *thread) {
     asm volatile ("cli");
 
     if (thread == current_task_TCB) {
+        asm volatile ("sti");
         return;
     }
 
     if (thread < threads + TCB_MAX_THREADS && thread >= threads) {
         used_threads--;
+        void *thread_stack = thread->esp0-0x3fff;
         memmove(thread, thread + 1, sizeof(tcb_t) * (TCB_MAX_THREADS - (thread - threads) - 1));
         if (current_task_TCB > thread) {
             current_task_TCB--;
         }
-        free_block(thread->esp0-0x3fff, 4, true);
+        if (!free_block(thread_stack, 4, true)) {
+            dead_stack_count++;
+            dead_stacks[dead_stack_count - 1] = (uint32_t)thread_stack;
+        }
     }
 
     asm volatile ("sti");

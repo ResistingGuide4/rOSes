@@ -11,7 +11,7 @@ typedef struct {
 
 void vmm_init();
 void *alloc_block(uint32_t size, bool isKernel);
-void free_block(void *addr, uint32_t size, bool isKernel);
+bool free_block(void *addr, uint32_t size, bool isKernel);
 void read_kernel_space();
 void read_user_space();
 void *get_physaddr(void *virtualaddr);
