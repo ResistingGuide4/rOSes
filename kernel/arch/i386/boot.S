@@ -231,3 +231,34 @@ switch_tasks:
    popl %ebx
 
    ret                           # Load next task's EIP from its kernel stack
+
+.global kill_switch_tasks
+kill_switch_tasks:
+   # Load next task's state
+   movl 4(%esp), %esi          # esi = next task's thread control block argument
+   call get_thread_index
+   movl %esi, current_task_TCB  # Current task's TCB is the next task TCB
+
+   movl 4(%esi),%esp            # Load ESP for next task's kernel stack from the thread's TCB
+
+   pushl %eax
+   call kill_thread
+   addl $4, %esp
+
+   movl current_task_TCB, %esi  # Readjust esi for any changes
+   movl 8(%esi),%eax            # eax = address of page directory for next task
+   movl (%esi),%ebx             # ebx = address for the top of the next task's kernel stack
+   movl %ebx,tss_1+4            # Adjust the ESP0 field in the TSS (used by CPU for for CPL=3 -> CPL=0 privilege level changes)
+   movl %cr3, %ecx              # ecx = previous task's virtual address space
+
+   cmpl %ecx, %eax              # Does the virtual address space need to be changed?
+   je .finish                   # no, virtual address space is the same, so don't reload it and cause TLB flushes
+   movl %eax, %cr3              # yes, load the next task's virtual address space
+.finish:
+   popl %ebp
+   popl %edi
+   popl %esi
+   popl %ebx
+
+   sti
+   ret                           # Load next task's EIP from its kernel stack

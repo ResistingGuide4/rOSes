@@ -12,7 +12,8 @@ typedef struct  __attribute__((packed)) {
 
 void switch_thread(bool send_eoi);
 tcb_t *new_thread(uint32_t *eip, uint32_t *cr3);
-void kill_thread(tcb_t *thread);
+void kill_thread(uint32_t index);
 void read_threads();
+uint32_t get_thread_index();
 
 #endif

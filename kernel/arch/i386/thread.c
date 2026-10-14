@@ -9,6 +9,7 @@
 #define TCB_MAX_THREADS 6
 
 extern void switch_tasks(tcb_t *next_task);
+extern void kill_switch_tasks(tcb_t *next_task);
 extern uint8_t stack_top;
 
 tcb_t *current_task_TCB = NULL;
@@ -86,13 +87,17 @@ tcb_t *new_thread(uint32_t *eip, uint32_t *cr3) {
 }
 
 // Make sure to kill a thread from a different one
-void kill_thread(tcb_t *thread) {
-    asm volatile ("cli");
-
-    if (thread == current_task_TCB) {
-        asm volatile ("sti");
+void kill_thread(uint32_t index) {
+    if (used_threads <= 1 || index >= TCB_MAX_THREADS) {
         return;
     }
+    asm volatile ("cli");
+
+    if (index == get_thread_index()) {
+        kill_switch_tasks((current_task_TCB == threads + used_threads - 1 ? threads : current_task_TCB + 1));
+        return;
+    }
+    tcb_t *thread = &threads[index];
 
     if (thread < threads + TCB_MAX_THREADS && thread >= threads) {
         used_threads--;
@@ -106,8 +111,6 @@ void kill_thread(tcb_t *thread) {
             dead_stacks[dead_stack_count - 1] = (uint32_t)thread_stack;
         }
     }
-
-    asm volatile ("sti");
 }
 
 void read_threads() {
@@ -115,5 +118,8 @@ void read_threads() {
         printf("Thread esp0: %X | Thread esp: %X | Thread cr3: %X\n", threads[i].esp0, threads[i].esp, threads[i].cr3);
     }
     printf("%d", used_threads);
-    printf("\n");
+}
+
+uint32_t get_thread_index() {
+    return current_task_TCB - threads;
 }
