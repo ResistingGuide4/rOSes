@@ -22,5 +22,6 @@ struct __attribute__((packed)) heap_header {
 void *kmalloc(size_t size);
 void kfree(void *addr);
 void read_heap();
+bool test_heap();
 
 #endif

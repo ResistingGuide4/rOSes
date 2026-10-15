@@ -146,6 +146,9 @@ void kfree(void *addr) {
 	while (prev_header != NULL && prev_header->status == HEAP_FREE && (uint8_t *)prev_header + sizeof(heap_header_t) + prev_header->size == (uint8_t *)current_header) {
 		prev_header->size += sizeof(heap_header_t) + current_header->size;
 		prev_header->next = current_header->next;
+		if (current_header->next) {
+			current_header->next->prev = prev_header;
+		}
 		current_header = prev_header;
 		prev_header = current_header->prev;
 	}
@@ -154,6 +157,9 @@ void kfree(void *addr) {
 	while (next_header != NULL && next_header->status == HEAP_FREE && (uint8_t *)current_header + sizeof(heap_header_t) + current_header->size == (uint8_t *)next_header) {
 		current_header->size += sizeof(heap_header_t) + next_header->size;
 		current_header->next = next_header->next;
+		if (next_header->next) {
+			next_header->next->prev = current_header;
+		}
 		next_header = current_header->next;
 	}
 }
@@ -162,5 +168,49 @@ void read_heap() {
 	for (heap_header_t *ptr = start_header; ptr != NULL; ptr = ptr->next) {
 		printf("Addr of Block: %X | Size: %X | Status: %s\n", (uintptr_t)(ptr + 1), ptr->size, (ptr->status == HEAP_FREE ? "FREE" : "USED"));
 	}
-	printf("\n");
+}
+
+static uint32_t checksum() {
+	uint32_t key = 2983;
+
+	heap_header_t *ptr = start_header;
+	while (ptr != NULL) {
+		key *= ptr->size;
+		key *= ptr->status;
+		key *= (uint32_t)(ptr->prev) + 1; // Prevents "* 0"
+		key *= (uint32_t)(ptr->next) + 1; // Prevents "* 0"
+		ptr = ptr->next;
+	}
+
+	return key;
+}
+
+bool test_heap() {
+	uint32_t start_key = checksum();
+
+	uint32_t *a = kmalloc(32);
+	uint8_t *b = kmalloc(8);
+	uint16_t *c = kmalloc(16);
+	uint8_t *d = kmalloc(4096);
+	*a = 0xABCDEFAB;
+	*b = 0xBC;
+	*c = 0xCDEF;
+	d[4095] = 0xFF;
+	if (*a != 0xABCDEFAB || *b != 0xBC || *c != 0xCDEF || d[4095] != 0xFF) {
+		kfree(b);
+		kfree(c);
+		kfree(a);
+		kfree(d);
+		return false;
+	}
+
+	kfree(b);
+	kfree(c);
+	kfree(a);
+	kfree(d);
+
+	if (checksum() != start_key) {
+		return false;
+	}
+	return true;
 }
