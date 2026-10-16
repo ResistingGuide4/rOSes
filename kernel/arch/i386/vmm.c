@@ -42,7 +42,7 @@ static vmm_block_t *check_upper(vmm_block_t *block, bool is_kernel_space) {
     vmm_block_t tmp;
     vmm_block_t *space_start = (is_kernel_space ? kernel_space : user_space);
     vmm_block_t *space_end = (is_kernel_space ? kernel_space_end : user_space_end);
-    if (block <= space_start || block > space_end) {
+    if (block < space_start || block > space_end) {
         return block;
     }
 
@@ -53,14 +53,18 @@ static vmm_block_t *check_upper(vmm_block_t *block, bool is_kernel_space) {
         block -= 1;
     }
 
-    // TODO: Check for coalesce lower as well
-
-    for (size_t i = (size_t)(block - space_start); i > 0; --i) {
-        vmm_block_t *ptr = &space_start[i - 1];
+    for (size_t i = 0; i <= (size_t)(space_end - space_start); i++) {
+        vmm_block_t *ptr = &space_start[i];
+        if (ptr == block) {
+            continue;
+        }
         if (ptr->addr == (block->addr + block->size * 4096)) {
             ptr->addr = block->addr;
             ptr->size += block->size;
             memmove(block, block + 1, (size_t)(space_end - block) * sizeof *block);
+            if (ptr > block) {
+                ptr--;
+            }
             if (is_kernel_space) {
                 kernel_space_end--;
             } else {
@@ -72,6 +76,9 @@ static vmm_block_t *check_upper(vmm_block_t *block, bool is_kernel_space) {
         if (block->addr == (ptr->addr + ptr->size * 4096)) {
             ptr->size += block->size;
             memmove(block, block + 1, (size_t)(space_end - block) * sizeof *block);
+            if (ptr > block) {
+                ptr--;
+            }
             if (is_kernel_space) {
                 kernel_space_end--;
             } else {
@@ -196,16 +203,23 @@ void *alloc_block(uint32_t size, bool isKernel) {
         void *phys_addr = alloc_page();
         if (phys_addr == NULL || !map_page(phys_addr, virt_addr + i * 0x1000, 0x02 | (isKernel ? 0x2 : 0x6))) {
             if (phys_addr != NULL) {
-                free_page((uint32_t)phys_addr);
+                free_page(phys_addr);
             }
             free_block->size += size;
             free_block = check_upper(free_block, isKernel);
             for (unsigned int j = 0; j < i; j++) {
-                free_page((uint32_t)get_physaddr(virt_addr + j * 4096));
+                free_page(get_physaddr(virt_addr + j * 4096));
                 unmap_page(virt_addr + j * 4096);
             }
             flush_tlb();
             return NULL;
+        }
+    }
+    if (free_block->size == 0) {
+        if (isKernel) {
+            kernel_space_end--; // If the free block is 0, it will always be at the end
+        } else {
+            user_space_end--;
         }
     }
 
@@ -261,10 +275,11 @@ bool free_block(void *addr, uint32_t size, bool isKernel) {
     }
 
     for (unsigned int i = 0; i < size; i++) {
-        free_page((uint32_t)get_physaddr(addr + i * 4096));
+        free_page(get_physaddr(addr + i * 4096));
         unmap_page(addr + i * 4096);
         
     }
+    coalesce();
     flush_tlb();
     return true;
 }
@@ -279,4 +294,53 @@ void read_user_space() {
     for (vmm_block_t *ptr = user_space; ptr <= user_space_end; ptr++) {
         printf("Address: %X | Size: %u\n", ptr->addr, ptr->size);
     }
+}
+
+static uint32_t checksum() {
+	uint32_t key = 2983;
+
+    vmm_block_t *ptr;
+	for (size_t i = 0; i <= (size_t)(kernel_space_end - kernel_space); i++) {
+        ptr = kernel_space + i;
+        key *= (uint32_t)(ptr->addr) + 1;
+        key *= ptr->size;
+    }
+
+	return key;
+}
+
+bool test_vmm() {
+    uint32_t start_key = checksum();
+
+    volatile uint32_t *a = alloc_block(1, true);
+    volatile uint32_t *b = alloc_block(2, true);
+    volatile uint32_t *c = alloc_block(8, true);
+
+    if (a == NULL || b == NULL || c == NULL) {
+        return false;
+    }
+
+    for (unsigned int i = 0; i < 128; i++) {
+		a[i] = start_key * (i + 1);
+		if (a[i] != start_key * (i + 1)) {
+			return false;
+		}
+	}
+
+    for (unsigned int i = 0; i < 256; i++) {
+		b[i] = start_key * (i + 1);
+		if (b[i] != start_key * (i + 1)) {
+			return false;
+		}
+	}
+
+
+    free_block((uint32_t *)a, 1, true);
+    free_block((uint32_t *)b, 2, true);
+    free_block((uint32_t *)c, 8, true);
+
+    if (start_key != checksum()) {
+        return false;
+    }
+    return true;
 }

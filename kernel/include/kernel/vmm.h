@@ -15,5 +15,6 @@ bool free_block(void *addr, uint32_t size, bool isKernel);
 void read_kernel_space();
 void read_user_space();
 void *get_physaddr(void *virtualaddr);
+bool test_vmm();
 
 #endif

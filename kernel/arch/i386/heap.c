@@ -191,12 +191,21 @@ bool test_heap() {
 	uint32_t *a = kmalloc(32);
 	uint8_t *b = kmalloc(8);
 	uint16_t *c = kmalloc(16);
-	uint8_t *d = kmalloc(4096);
+	uint32_t *d = kmalloc(4096);
+	if (a == NULL || b == NULL || c == NULL || d == NULL) {
+		return false;
+	}
 	*a = 0xABCDEFAB;
 	*b = 0xBC;
 	*c = 0xCDEF;
-	d[4095] = 0xFF;
-	if (*a != 0xABCDEFAB || *b != 0xBC || *c != 0xCDEF || d[4095] != 0xFF) {
+	for (unsigned int i = 0; i < 128; i++) {
+		d[i] = start_key * (i + 1);
+		if (d[i] != start_key * (i + 1)) {
+			return false;
+		}
+	}
+
+	if (*a != 0xABCDEFAB || *b != 0xBC || *c != 0xCDEF) {
 		kfree(b);
 		kfree(c);
 		kfree(a);
